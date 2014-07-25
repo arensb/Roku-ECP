@@ -1,0 +1,7 @@
+Roku::ECP: Roku External Control Protocol
+
+Roku External Control Guide:
+http://sdkdocs.roku.com/display/sdkdoc/External+Control+Guide
+
+Roku also supports DIAL.
+http://www.dial-multiscreen.org/dial-protocol-specification
