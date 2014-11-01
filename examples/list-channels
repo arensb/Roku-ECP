@@ -1,0 +1,41 @@
+#!/usr/local/bin/perl
+use strict;
+use Data::Dumper;
+
+# Look in 'lib' next to the script.
+use FindBin;
+use lib "$FindBin::Bin/../lib";
+
+use Roku::ECP;
+
+# Get the Roku's host name or address from the command line.
+our $hostname = shift;
+if (!defined($hostname))
+{
+	die "Usage: $0 <roku-hostname>|<roku-addr>";
+}
+our $hostaddr;
+
+# Initialize the $roku object
+our $roku = new Roku::ECP hostname => $hostname;
+
+# Read the list of apps
+our @apps = $roku->apps;
+if (@apps == 1 && !defined($apps[0]))
+{
+	# In case of error, $roku->apps returns undef, which we see as
+	# an array with one element: undef.
+	die "Couldn't get apps from $hostname";
+}
+
+# List the apps we found.
+print "Found ", scalar(@apps), " apps:\n";
+foreach my $app (@apps)
+{
+	print <<EOT;
+app $app->{'name'}:
+    id:      $app->{'id'}
+    version: $app->{'version'}
+    type:    $app->{'type'}
+EOT
+}

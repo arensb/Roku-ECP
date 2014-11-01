@@ -1,0 +1,24 @@
+#!/usr/local/bin/perl
+use strict;
+use Data::Dumper;
+
+# Look in 'lib' next to the script.
+use FindBin;
+use lib "$FindBin::Bin/../lib";
+
+use Roku::ECP;
+
+our $hostname = shift;
+our $app_name = shift;
+
+our $roku = new Roku::ECP hostname => $hostname;
+
+our $icon = $roku->geticonbyname($app_name);
+if (!defined($icon) || !$icon->{'status'})
+{
+	die "Can't get icon: $icon->{message}";
+}
+
+print STDERR "Icon MIME type: $icon->{'Content-Type'}\n";
+# Print the icon to stdout.
+print $icon->{'data'};
