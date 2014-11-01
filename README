@@ -5,3 +5,16 @@ http://sdkdocs.roku.com/display/sdkdoc/External+Control+Guide
 
 Roku also supports DIAL.
 http://www.dial-multiscreen.org/dial-protocol-specification
+
+* SSDP
+According to
+http://sdkdocs.roku.com/display/sdkdoc/External+Control+Guide
+the Roku supports Simple Service Discovery Protocol (SSDP), which is
+the basis for UPnP.
+
+I think that what that example doesn't tell you is that SSDP uses UDP,
+not TCP, so run 'ncat' with "-u".
+
+Presumably need to send out the SSDP HTTP query out over UDP, while
+listening on UDP for incoming connections. By the same token, need to
+specify the port for the return connections to come in on.
