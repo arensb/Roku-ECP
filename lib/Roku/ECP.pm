@@ -129,8 +129,6 @@ sub apps
 	}
 	my $text = $result->decoded_content();
 
-	$self->{'appname2id'} = {};	# Map app name to its ID
-
 	# Yeah, ideally it'd be nice to have a full-fledged XML parser
 	# but I can't be bothered until it actually becomes a problem.
 	# We expect lines of the form
@@ -156,6 +154,7 @@ sub apps
 			};
 	}
 
+	$self->{'apps'} = [@retval];	# Cache a copy
 	return @retval;
 }
 
@@ -231,12 +230,43 @@ sub geticonbyid
 	};
 }
 
+=head2 C<geticonbyname>
+
+  my $icon = $r->geticonbyid("My Roku Channel");
+  print ICONFILE $icon->{data} if $icon->{status};
+
+Fetches an app's icon.
+
+Takes the name of an app (a string).
+
+Returns an anonymous hash describing the app's icon, in the same
+format as C<geticonbyid>.
+=cut
 sub geticonbyname
 {
-	# XXX - Prettier wrapper around geticonby id:
-	# XXX - Call 'apps' if necessary
-	# XXX - Look up the app name in the id table
-	# XXX - Call geticonbyid
+	my $self = shift;
+	my $appname = shift;
+
+	# Call 'apps' if necessary, to get a list of apps installed on
+	# the Roku.
+	if (!defined($self->{'apps'}))
+	{
+		# Fetch list of apps, since we don't have it yet
+		$self->apps;
+	}
+
+	# Look up the app name in the id table
+	my $id = undef;
+	foreach my $app (@{$self->{'apps'}})
+	{
+		next unless $app->{'name'} eq $appname;
+		$id = $app->{'id'};
+		last;
+	}
+	return undef if !defined($id);	# Name not found
+
+	# Call geticonbyid to do the hard work.
+	return $self->geticonbyid($id);
 }
 
 # XXX - Input - Send custom events to a Brightscript app
