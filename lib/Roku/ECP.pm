@@ -6,6 +6,31 @@ use Data::Dumper;	# For debugging
 use LWP::UserAgent;
 use HTTP::Request;
 
+our $VERSION = "0.0.1";
+our $USER_AGENT = __PACKAGE__ . "/" . $VERSION;
+		# User agent, for HTTP requests.
+
+# XXX - Known keys:
+# Lit_* (replace "*" with a letter, e.g., send an "r" with "Lit_r")
+use constant {
+	KEY_Home	=> "home",
+	KEY_Rev		=> "rev",
+	KEY_Fwd		=> "fwd",
+	KEY_Play	=> "play",
+	KEY_Select	=> "select",
+	KEY_Left	=> "left",
+	KEY_Right	=> "right",
+	KEY_Down	=> "down",
+	KEY_Up		=> "up",
+	KEY_Back	=> "back",
+	KEY_InstantReplay	=> "instantreplay",
+	KEY_Info	=> "info",
+	KEY_Backspace	=> "backspace",
+	KEY_Search	=> "search",
+	KEY_Enter	=> "enter",
+};
+# Any UTF-8 character, URL-encoded.
+
 =head1 NAME
 
 Roku::ECP - External Control Protocol for Roku
@@ -119,7 +144,7 @@ sub apps
 	my $self = shift;
 	my @retval = ();
 	my $ua = new LWP::UserAgent
-		agent => "Roku::ECP/0.0.1 ";
+		agent => $USER_AGENT;
 	my $result = $ua->get("$self->{'url_base'}/query/apps");
 	if ($result->code !~ /^2..$/)
 	{
@@ -212,7 +237,7 @@ sub geticonbyid
 	my $app_id = shift;
 
 	my $ua = new LWP::UserAgent
-		agent => "Roku::ECP/0.0.1 ";
+		agent => $USER_AGENT;
 	my $result = $ua->get("$self->{url_base}/query/icon/$app_id");
 	if ($result->code !~ /^2..$/)
 	{
