@@ -14,7 +14,6 @@ if (!defined($hostname))
 {
 	die "Usage: $0 <roku-hostname>|<roku-addr>";
 }
-our $hostaddr;
 
 # Initialize the $roku object
 our $roku = new Roku::ECP hostname => $hostname;
