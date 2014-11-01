@@ -18,3 +18,24 @@ not TCP, so run 'ncat' with "-u".
 Presumably need to send out the SSDP HTTP query out over UDP, while
 listening on UDP for incoming connections. By the same token, need to
 specify the port for the return connections to come in on.
+
+* Deep Linking
+** Channel Store
+http://myroku.dom.ain:8060/launch/11?contentID=28
+
+11 is the Channel Store.
+28 is the ID of a channel in the store.
+
+Also works with private channels, looks like.
+Doesn't work with string channel IDs, though.
+
+** YouTube
+837 is the YouTube channel
+The ContentID is the YouTube video ID.
+http://myroku.dom.ain:8060/launch/837?contentID=sfbr8Y6NYL4
+
+** Pandora
+Pandora channel ID: 28
+http://myroku.dom.ain:8060/launch/28?contentID=40793346033480140
+
+The contentID is the ID of a Pandora channel.
