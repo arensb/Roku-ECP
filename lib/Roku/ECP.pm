@@ -185,6 +185,23 @@ sub apps
 
 # XXX - Keydown
 #	POST keydown/$key
+sub keydown
+{
+	my $self = shift;
+	my $key = shift;
+
+	# XXX - It'd be nice to be able to send an arbitrary string,
+	# even if it means splitting it up into umpteen separate HTTP
+	# requests. But how do we distinguish one of the predefined
+	# keys listed above, from an arbitrary string? (And, of
+	# course, we want to be able to send the string "KEY_Home".)
+	my $ua = new LWP::UserAgent
+		agent => $USER_AGENT;
+	my $url = "$self->{'url_base'}/keydown/" . $key;
+	my $result = $ua->post("$self->{'url_base'}/keydown/" . $key,
+			       {});
+}
+
 # XXX - Keyup
 #	POST keyup/$key
 # XXX - Keypress
