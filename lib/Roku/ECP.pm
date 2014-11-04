@@ -4,11 +4,33 @@
 package Roku::ECP;
 use Data::Dumper;	# For debugging
 use LWP::UserAgent;
-use HTTP::Request;
 
 our $VERSION = "0.0.1";
 our $USER_AGENT = __PACKAGE__ . "/" . $VERSION;
 		# User agent, for HTTP requests.
+
+=head1 NAME
+
+Roku::ECP - External Control Protocol for Roku
+
+=head1 SYNOPSIS
+
+  use Roku::ECP;
+
+  my $r = new Roku::ECP
+	hostname => "my-settop-box.dom.ain";
+
+  my @apps = $r->apps();
+
+  my $icon = $r->geticonbyid("12345");
+  my $icon = $r->geticonbyid("12345");
+
+=head1 DESCRIPTION
+
+Roku::ECP implements the Roku External Control Guide, which permits
+callers to query and control a Roku over the network.
+
+=cut
 
 # XXX - Known keys:
 # Lit_* (replace "*" with a letter, e.g., send an "r" with "Lit_r")
@@ -30,27 +52,6 @@ use constant {
 	KEY_Enter	=> "enter",
 };
 # Any UTF-8 character, URL-encoded.
-
-=head1 NAME
-
-Roku::ECP - External Control Protocol for Roku
-
-=head1 SYNOPSIS
-
-  use Roku::ECP;
-
-  my $r = new Roku::ECP
-	hostname => "my-settop-box.dom.ain";
-
-  my @apps = $r->apps();
-
-  my $icon = $r->geticonbyid("12345");
-  my $icon = $r->geticonbyid("12345");
-
-=head1 DESCRIPTION
-
-Roku::ECP implements the Roku External Control Guide, which permits
-callers to
 
 =head1 METHODS
 =cut
@@ -136,6 +137,42 @@ sub new
 # XXX - Perhaps add a wrapper around the REST calls? We know the base
 # URL from the constructor. The wrapper can take the path (e.g.,
 # "/query/apps") and arguments, escape them properly and so on.
+
+# _rest_request
+sub _rest_request
+{
+	my $self = shift;
+	my $method = shift;	# "GET" or "POST"
+	my $path = shift;	# A URL path, like "/query/apps" or "/launch"
+	my $result;
+
+	# Call the right method for the request type.
+	if ($method eq "GET")
+	{
+		$result = $self->{'ua'}->get($self->{'url_base'} . $path,
+					     @_);
+	} elsif ($method eq "POST") {
+		$result = $self->{'ua'}->post($self->{'url_base'} . $path,
+					      @_);
+	} else {
+		# XXX - Complain and die
+	}
+				       {});
+	if ($result->code !~ /^2..$/)
+	{
+		return {
+			status	=> undef,	# Unhappy
+			error	=> $result->code(),
+			message	=> $result->message(),
+		};
+	}
+
+	return {
+		status		=> 1,		# We're happy
+		"Content-Type"	=> $result->header("Content-Type"),
+		data		=> $result->decoded_content(),
+	};
+}
 
 =head2 C<apps>
 
@@ -226,7 +263,6 @@ sub keydown
 	# requests. But how do we distinguish one of the predefined
 	# keys listed above, from an arbitrary string? (And, of
 	# course, we want to be able to send the string "KEY_Home".)
-	my $url = "$self->{'url_base'}/keydown/" . $key;
 	my $result = $self->{'ua'}->post("$self->{'url_base'}/keydown/" . $key,
 				       {});
 	if ($result->code !~ /^2..$/)
