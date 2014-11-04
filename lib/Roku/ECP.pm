@@ -54,6 +54,7 @@ callers to
 
 =head1 METHODS
 =cut
+
 # XXX - SSDP to discover devices?
 
 # Constructor: Encapsulate a Roku we want to talk to.
@@ -63,6 +64,7 @@ callers to
 #	port => port number
 # app2id: hash mapping app names to IDs.
 # id2app?: hash mapping app IDs to names.
+
 =head2 C<new>
 
   my $r = new Roku::ECP([I<var> => I<value>, ...])
@@ -120,9 +122,20 @@ sub new
 		(defined($retval->{'addr'}) ? $retval->{'addr'} : $retval->{'hostname'}) .
 		":$retval->{'port'}";
 
+	# Construct a LWP::UserAgent to use for REST calls. Might as
+	# well cache it if we're going to be making multiple calls.
+	# There might be some benefit in caching the connection as
+	# well.
+	$retval->{'ua'} = new LWP::UserAgent
+		agent => $USER_AGENT;
+
 	bless $retval, $class;
 	return $retval;
 }
+
+# XXX - Perhaps add a wrapper around the REST calls? We know the base
+# URL from the constructor. The wrapper can take the path (e.g.,
+# "/query/apps") and arguments, escape them properly and so on.
 
 =head2 C<apps>
 
@@ -143,9 +156,7 @@ sub apps
 {
 	my $self = shift;
 	my @retval = ();
-	my $ua = new LWP::UserAgent
-		agent => $USER_AGENT;
-	my $result = $ua->get("$self->{'url_base'}/query/apps");
+	my $result = $self->{'ua'}->get("$self->{'url_base'}/query/apps");
 	if ($result->code !~ /^2..$/)
 	{
 		warn "Error: query/apps got status " . $result->code .
@@ -185,6 +196,26 @@ sub apps
 
 # XXX - Keydown
 #	POST keydown/$key
+
+# XXX - Ought to have two functions: &keydown(a,b,c,...), for named
+# keys, and &keydown_str("hello world"), for strings.
+#
+# The former takes an arbitrary number of arguments; each one is the
+# name of a known key (the KEY_* constants, above). &keydown sends
+# each key in turn. That's because
+#	&keydown(KEY_Home, KEY_Down, KEY_Right)
+# is prettier than
+#	&keydown(KEY_Home)
+#	&keydown(KEY_Down)
+#	&keydown(KEY_Right)
+# Perhaps &keydown can also check whether an argument matches /^Lit_(.)$/
+# and if so, send that character.
+#
+# &keydown_str, OTOH, takes one argument (okay, it can take several
+# arguments, if there's any reason to do that), a string. It splits
+# the string up into individual characters (not bytes; UTF-8
+# characters) and sends a series of Lit_* characters (or whatever the
+# best way is to send a series of characters).
 sub keydown
 {
 	my $self = shift;
@@ -195,11 +226,23 @@ sub keydown
 	# requests. But how do we distinguish one of the predefined
 	# keys listed above, from an arbitrary string? (And, of
 	# course, we want to be able to send the string "KEY_Home".)
-	my $ua = new LWP::UserAgent
-		agent => $USER_AGENT;
 	my $url = "$self->{'url_base'}/keydown/" . $key;
-	my $result = $ua->post("$self->{'url_base'}/keydown/" . $key,
-			       {});
+	my $result = $self->{'ua'}->post("$self->{'url_base'}/keydown/" . $key,
+				       {});
+	if ($result->code !~ /^2..$/)
+	{
+		return {
+			status	=> undef,	# Unhappy
+			error	=> $result->code(),
+			message	=> $result->message(),
+		};
+	}
+
+	return {
+		status		=> 1,		# We're happy
+		"Content-Type"	=> $result->header("Content-Type"),
+		data		=> $result->decoded_content(),
+	};
 }
 
 # XXX - Keyup
@@ -252,10 +295,7 @@ sub geticonbyid
 {
 	my $self = shift;
 	my $app_id = shift;
-
-	my $ua = new LWP::UserAgent
-		agent => $USER_AGENT;
-	my $result = $ua->get("$self->{url_base}/query/icon/$app_id");
+	my $result = $self->{'ua'}->get("$self->{url_base}/query/icon/$app_id");
 	if ($result->code !~ /^2..$/)
 	{
 		return {
