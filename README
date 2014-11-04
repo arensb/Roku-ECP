@@ -39,3 +39,9 @@ Pandora channel ID: 28
 http://myroku.dom.ain:8060/launch/28?contentID=40793346033480140
 
 The contentID is the ID of a Pandora channel.
+
+** Amazon Instant Video
+Channel ID: 13
+
+There's probably a way to directly launch videos, but it's not as
+simple as 'contentID=<ASIN>'
