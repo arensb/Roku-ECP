@@ -24,18 +24,75 @@ Roku::ECP - External Control Protocol for Roku
 
   my @apps = $r->apps();
 
+  # Key and string input functions:
+  $r->keydown(Roku::ECP::Home);
+  $r->keyup(Roku::ECP::Down);
+  $r->keypress(Roku::ECP::Info,
+               Roku::ECP::Search,
+               Roku::ECP::Select);
+  $r->keydown_str("x");
+  $r->keyup_str("x");
+  $r->keydown_str("Hello world");
+
+  $r->launch($app_id);
+  $r->launch($app_id, "12345abcd");
+  $r->launch($app_id, "12345abcd", "movie");
+
   my $icon = $r->geticonbyid("12345");
-  my $icon = $r->geticonbyid("12345");
+  my $icon = $r->geticonbyname("My Roku Channel");
+
+  $r->acceleration($x, $y, $z);
+  $r->orientation($x, $y, $z);
+  $r->rotation($x, $y, $z);
+  $r->magnetic($x, $y, $z);
 
 =head1 DESCRIPTION
 
 Roku::ECP implements the Roku External Control Guide, which permits
 callers to query and control a Roku over the network.
 
+=head1 KEY NAMES
+
+The C<&key>* functions L<keypress>, L<keyup>, and L<keydown> take
+symbolic key names. They are:
+
+=over 4
+
+=item C<KEY_Home>
+
+=item C<KEY_Rev>
+
+=item C<KEY_Fwd>
+
+=item C<KEY_Play>
+
+=item C<KEY_Select>
+
+=item C<KEY_Left>
+
+=item C<KEY_Right>
+
+=item C<KEY_Down>
+
+=item C<KEY_Up>
+
+=item C<KEY_Back>
+
+=item C<KEY_InstantReplay>
+
+=item C<KEY_Info>
+
+=item C<KEY_Backspace>
+
+=item C<KEY_Search>
+
+=item C<KEY_Enter>
+
+=back
+
 =cut
 
-# XXX - Known keys:
-# Lit_* (replace "*" with a letter, e.g., send an "r" with "Lit_r")
+# These get fed to the /keypress (and friends) REST requests.
 use constant {
 	KEY_Home	=> "home",
 	KEY_Rev		=> "rev",
@@ -53,21 +110,15 @@ use constant {
 	KEY_Search	=> "search",
 	KEY_Enter	=> "enter",
 };
-# Any UTF-8 character, URL-encoded.
 
 =head1 METHODS
+
 =cut
 
-# XXX - SSDP to discover devices?
-# Does that require IO::Socket::Multicast?
-
-# Constructor: Encapsulate a Roku we want to talk to.
-# Perhaps take multiple types of arguments:
-#	name => hostname
-#	addr => IPv4 (or in future IPv6) address
-#	port => port number
-# app2id: hash mapping app names to IDs.
-# id2app?: hash mapping app IDs to names.
+# XXX - SSDP to discover devices wolud be nice. But I think that
+# requires IO::Socket::Multicast, and also me learning how to use it.
+# So for now, just keep your receipts so you know how many Rokus you
+# have.
 
 =head2 C<new>
 
@@ -102,6 +153,7 @@ Only one of C<hostname> and C<addr> needs to be specified. If both are
 given, the address takes precedence.
 
 =cut
+
 sub new
 {
 	my $class = shift;
@@ -161,7 +213,6 @@ sub _rest_request
 	my $url = new URI $self->{'url_base'} . $path;
 	$url->query_form(@_);	# Add the remaining arguments as query
 				# parameters ("?a=foo&b=bar")
-print "url [$url]\n";
 
 	# Call the right method for the request type.
 	if ($method eq "GET")
@@ -203,6 +254,7 @@ Returns a list of ref-to-hash entries listing the channels installed
 on the Roku.
 
 =cut
+
 sub apps
 {
 	my $self = shift;
@@ -244,39 +296,33 @@ sub apps
 	return @retval;
 }
 
-# XXX - Keydown
-#	POST keydown/$key
+=head2 Keypress functions
 
-# XXX - Ought to have two functions: &keydown(a,b,c,...), for named
-# keys, and &keydown_str("hello world"), for strings.
+These functions use predefined key names. See L<KEY NAMES>.
+
+All of these functions take any number of arguments, and send all of
+the keys to the Roku in sequence.
+
+These functions all return 1 if successful, or undef otherwise. In
+case of error, the return status does not say which parts of the
+request were successful; the undef just means that something went
+wrong.
+
+=cut
+
+# _key
+# This is an internal helper function for the keydown/keyup/keypress
+# functions. It takes key names (from the KEY_* constants, above) and
+# issues a series of REST requests to send each key in turn to the
+# Roku.
 #
-# The former takes an arbitrary number of arguments; each one is the
-# name of a known key (the KEY_* constants, above). &keydown sends
-# each key in turn. That's because
-#	&keydown(KEY_Home, KEY_Down, KEY_Right)
-# is prettier than
-#	&keydown(KEY_Home)
-#	&keydown(KEY_Down)
-#	&keydown(KEY_Right)
-# Perhaps &keydown can also check whether an argument matches /^Lit_(.)$/
-# and if so, send that character.
-#
-# &keydown_str, OTOH, takes one argument (okay, it can take several
-# arguments, if there's any reason to do that), a string. It splits
-# the string up into individual characters (not bytes; UTF-8
-# characters) and sends a series of Lit_* characters (or whatever the
-# best way is to send a series of characters).
+# Returns 1 on success, or undef on failure. If it fails, the return
+# status doesn't say which keys succeeded; it just means that not all
+# of them succeeded.
 sub _key
 {
 	my $self = shift;
-	my $url = shift;
-
-	# XXX - It'd be nice to be able to send an arbitrary string,
-	# even if it means splitting it up into umpteen separate HTTP
-	# requests. But how do we distinguish one of the predefined
-	# keys listed above, from an arbitrary string? (And, of
-	# course, we want to be able to send the string "KEY_Home".)
-#	my $result = $self->{'ua'}->post("$self->{'url_base'}/keydown/" . $key,
+	my $url = shift;	# The REST URL
 
 	foreach my $key (@_)
 	{
@@ -291,16 +337,34 @@ sub _key
 	return 1;			# Happy
 }
 
+# _key_str
+# This is an internal helper function similar to _key, but for letters
+# and such, rather than the buttons on the remote.
+#
+# It takes each string argument in turn, breaks it up into individual
+# characters, and uses _key to send each letter in turn. For instance,
+# the string "xyz" gets broken down into three requests: "Lit_x",
+# "Lit_y", and "Lit_z".
+#
+# And yes, you may pronounce it "keister" if you want.
 sub _key_str
 {
 	my $self = shift;
-	my $url = shift;
+	my $url = shift;	# The REST URL
 
 	my $result;
 	foreach my $str (@_)
 	{
+		# Break this string up into individual characters
 		foreach my $c ($str =~ m{.}sg)
 		{
+			# Send the character as a /key*/Lit_* REST
+			# request.
+			# Assume that the string is UTF-8, coded, so
+			# $c might be several non-ASCII bytes. We use
+			# uri_escape_utf8 to escape this properly, so
+			# that a Euro symbol gets sent as
+			# "Lit_%E2%82%AC"
 			$result = $self->_key($url,
 					      "Lit_" .
 						uri_escape_utf8($c));
@@ -310,12 +374,32 @@ sub _key_str
 	return 1;
 }
 
+=head3 C<keydown>
+
+  my $status = $r->keydown(key, [key...]);
+
+Sends a keydown event to the Roku. This is equivalent to pressing a
+key on the remote. Most people will want to use C<L<keypress>>
+instead.
+
+=cut
+
 sub keydown
 {
 	my $self = shift;
 
 	return $self->_key("/keydown", @_);
 }
+
+=head3 C<keydown_str>
+
+  my $status = $r->keydown_str($string, [$string...]);
+
+Takes a string, breaks it up into individual characters, and sends
+each one in turn to the Roku. Most people will want to use
+C<L<keypress_str>> instead.
+
+=cut
 
 sub keydown_str
 {
@@ -325,8 +409,14 @@ print "inside keydown_str(@_)\n";
 	return $self->_key_str("/keydown", @_);
 }
 
-# XXX - Keyup
-#	POST keyup/$key
+=head3 C<keyup>
+
+  my $status = $r->keyup(key, [key,...]);
+
+Sends a keyup event to the Roku. This is equivalent to releasing a key
+on the remote. Most people will want to use C<L<keypress>> instead.
+
+=cut
 
 sub keyup
 {
@@ -334,8 +424,16 @@ sub keyup
 
 	return $self->_key("/keyup", @_);
 }
-# XXX - Keypress
-#	POST keypress/$key
+
+=head3 C<keyup_str>
+
+  my $status = $r->keyup_str($string, [$string...]);
+
+Takes a string, breaks it up into individual characters, and sends
+each one in turn to the Roku. Most people will want to use
+C<L<keypress_str>> instead.
+
+=cut
 
 sub keyup_str
 {
@@ -344,12 +442,30 @@ sub keyup_str
 	return $self->_key_str("/keyup", @_);
 }
 
+=head3 C<keypress>
+
+  my $status = $r->keypress(key, [key,...]);
+
+Sends a keypress event to the Roku. This is equivalent to releasing a key
+on the remote, then releasing it.
+
+=cut
+
 sub keypress
 {
 	my $self = shift;
 
 	return $self->_key("/keypress", @_);
 }
+
+=head3 C<keypress_str>
+
+  my $status = $r->keypress_str($string, [$string...]);
+
+Takes a string, breaks it up into individual characters, and sends
+each one in turn to the Roku.
+
+=cut
 
 sub keypress_str
 {
@@ -358,8 +474,24 @@ sub keypress_str
 	return $self->_key_str("/keypress", @_);
 }
 
-# XXX - Launch
-#	POST launch/$app_id[?$params...]
+=head2 C<launch>
+
+    $r->launch($app_id);
+    $r->launch($app_id, $contentid);
+    $r->launch($app_id, $contentid, $mediatype)
+
+Launch an app on the Roku, optionally giving it an argument saying
+what to do.
+
+The app ID can be obtained from C<L<apps>>.
+
+The optional C<$contentid> and C<$mediatype> arguments can be used to
+implement deep linking, if the channel supports it. For instance,
+C<$contentid> might be the ID number of a movie that the channel will
+then automatically start playing. Likewise, C<$mediatype> can be used
+to tell the channel what sort of entity C<$contentid> refers to.
+
+=cut
 
 sub launch
 {
@@ -434,6 +566,7 @@ The binary data of the icon.
 =back
 
 =cut
+
 sub geticonbyid
 {
 	my $self = shift;
@@ -467,7 +600,9 @@ Takes the name of an app (a string).
 
 Returns an anonymous hash describing the app's icon, in the same
 format as C<geticonbyid>.
+
 =cut
+
 sub geticonbyname
 {
 	my $self = shift;
@@ -495,18 +630,23 @@ sub geticonbyname
 	return $self->geticonbyid($id);
 }
 
-# XXX - Input - Send custom events to a Brightscript app
-#	POST /input?[$var=$val&...]
-# From the doc:
-# Example: POST /input?acceleration.x=0.0&acceleration.y=0.0&acceleration.z=9.8
+=head2 Vector input methods
 
-# acceleration.x , acceleration.y , acceleration.z
-# orientation.x , orientation.y , orientation.z
-# rotation.x , rotation.y , rotation.z
-# magnetic.x , magnetic.y , magnetic.z
+The following methods send three-dimensional vectors to the
+currently-running application. They each take three arguments: C<$x>,
+C<$y>, C<$z>.
 
-# XXX - Write up POD for the functions below.
+These functions use one of two coordinate systems: relative to the
+remote, or relative to the Earth. See the External Control Guide in
+the Roku documentation for details.
 
+These functions all return 1 if successful, or undef if not.
+
+=cut
+
+# _input
+# Internal helper function for the user-visible input functions. Those
+# are just implemented with _input.
 sub _input
 {
 	my $self = shift;
@@ -528,6 +668,15 @@ sub _input
 	return 1;		# Happy
 }
 
+=head3 C<acceleration>
+
+  my $status = $r->acceleration($x, $y, $z);
+
+Send an acceleration event to the currently-running application,
+indicating motion in space.
+
+=cut
+
 sub acceleration
 {
 	my $self = shift;
@@ -537,6 +686,15 @@ sub acceleration
 
 	return $self->_input("acceleration", $x, $y, $z);
 }
+
+=head3 C<orientation>
+
+  my $status = $r->orientation($x, $y, $z);
+
+Send an orientation event to the currently-running application,
+indicating tilting or displacement from lying flat.
+
+=cut
 
 sub orientation
 {
@@ -548,6 +706,15 @@ sub orientation
 	return $self->_input("orientation", $x,  $y, $z);
 }
 
+=head3 C<rotation>
+
+  my $status = $r->rotation($x, $y, $z);
+
+Send a rotation event to the currently-running application, indicating
+rotation around an axis.
+
+=cut
+
 sub rotation
 {
 	my $self = shift;
@@ -558,6 +725,15 @@ sub rotation
 	return $self->_input("rotation", $x,  $y, $z);
 }
 
+=head3 C<magnetic>
+
+  my $status = $r->magnetic($x, $y, $z);
+
+Send a magnetometer event to the currently-running application,
+indicating the strength of the local magnetic field.
+
+=cut
+
 sub magnetic
 {
 	my $self = shift;
@@ -567,6 +743,10 @@ sub magnetic
 
 	return $self->_input("magnetic", $x,  $y, $z);
 }
+
+# XXX - /input allegedly also supports touch and multi-touch, but I
+# can't tell from the documentation how to send those.
+
 =head1 SEE ALSO
 
 =over 4
