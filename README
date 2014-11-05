@@ -1,4 +1,12 @@
-Roku::ECP: Roku External Control Protocol
+* Roku::ECP: Roku External Control Protocol
+
+** Requirements:
+
+- Encode
+- URI
+- URI::Escape
+- LWP::UserAgent
+- FindBin
 
 Roku External Control Guide:
 http://sdkdocs.roku.com/display/sdkdoc/External+Control+Guide
