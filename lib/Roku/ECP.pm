@@ -2,7 +2,9 @@
 # Package implementing Roku External Control Guide:
 # http://sdkdocs.roku.com/display/sdkdoc/External+Control+Guide
 package Roku::ECP;
-use Data::Dumper;	# For debugging
+use Encode;		# To encode chars as UTF8
+use URI;
+use URI::Escape;	# To encode chars in URLs
 use LWP::UserAgent;
 
 our $VERSION = "0.0.1";
@@ -57,6 +59,7 @@ use constant {
 =cut
 
 # XXX - SSDP to discover devices?
+# Does that require IO::Socket::Multicast?
 
 # Constructor: Encapsulate a Roku we want to talk to.
 # Perhaps take multiple types of arguments:
@@ -134,30 +137,41 @@ sub new
 	return $retval;
 }
 
-# XXX - Perhaps add a wrapper around the REST calls? We know the base
-# URL from the constructor. The wrapper can take the path (e.g.,
-# "/query/apps") and arguments, escape them properly and so on.
-
 # _rest_request
+# Wrapper around REST calls.
+# $self->_rest_request(method, path,
+#	arg0 => value0,
+#	arg1 => value1,
+#	...
+#	)
+# Where:
+# "method" is either "GET" or "POST'.
+# "path" is a URL path, e.g., "/query/apps" or "/launch". This comes
+#	after the base URL, which was defined in the constructor.
+# The remaining argument pairs are passed along
 sub _rest_request
 {
 	my $self = shift;
 	my $method = shift;	# "GET" or "POST"
 	my $path = shift;	# A URL path, like "/query/apps" or "/launch"
+
 	my $result;
+
+	# Construct the URL
+	my $url = new URI $self->{'url_base'} . $path;
+	$url->query_form(@_);	# Add the remaining arguments as query
+				# parameters ("?a=foo&b=bar")
+print "url [$url]\n";
 
 	# Call the right method for the request type.
 	if ($method eq "GET")
 	{
-		$result = $self->{'ua'}->get($self->{'url_base'} . $path,
-					     @_);
+		$result = $self->{'ua'}->get($url);
 	} elsif ($method eq "POST") {
-		$result = $self->{'ua'}->post($self->{'url_base'} . $path,
-					      @_);
+		$result = $self->{'ua'}->post($url);
 	} else {
 		# XXX - Complain and die
 	}
-				       {});
 	if ($result->code !~ /^2..$/)
 	{
 		return {
@@ -193,14 +207,13 @@ sub apps
 {
 	my $self = shift;
 	my @retval = ();
-	my $result = $self->{'ua'}->get("$self->{'url_base'}/query/apps");
-	if ($result->code !~ /^2..$/)
+	my $result = $self->_rest_request("GET", "/query/apps");
+	if (!$result->{'status'})
 	{
-		warn "Error: query/apps got status " . $result->code .
-			": " . $result->message;
+		warn "Error: query/apps got status $result->{error}: $result->{message}";
 		return undef;
 	}
-	my $text = $result->decoded_content();
+	my $text = $result->{'data'};
 
 	# Yeah, ideally it'd be nice to have a full-fledged XML parser
 	# but I can't be bothered until it actually becomes a problem.
@@ -253,41 +266,135 @@ sub apps
 # the string up into individual characters (not bytes; UTF-8
 # characters) and sends a series of Lit_* characters (or whatever the
 # best way is to send a series of characters).
-sub keydown
+sub _key
 {
 	my $self = shift;
-	my $key = shift;
+	my $url = shift;
 
 	# XXX - It'd be nice to be able to send an arbitrary string,
 	# even if it means splitting it up into umpteen separate HTTP
 	# requests. But how do we distinguish one of the predefined
 	# keys listed above, from an arbitrary string? (And, of
 	# course, we want to be able to send the string "KEY_Home".)
-	my $result = $self->{'ua'}->post("$self->{'url_base'}/keydown/" . $key,
-				       {});
-	if ($result->code !~ /^2..$/)
-	{
-		return {
-			status	=> undef,	# Unhappy
-			error	=> $result->code(),
-			message	=> $result->message(),
-		};
-	}
+#	my $result = $self->{'ua'}->post("$self->{'url_base'}/keydown/" . $key,
 
-	return {
-		status		=> 1,		# We're happy
-		"Content-Type"	=> $result->header("Content-Type"),
-		data		=> $result->decoded_content(),
-	};
+	foreach my $key (@_)
+	{
+		my $result = $self->_rest_request("POST", "$url/$key");
+
+		if (!$result->{'status'})
+		{
+			warn "Error: $url/$key got status $result->{error}: $result->{message}";
+			return undef;
+		}
+	}
+	return 1;			# Happy
+}
+
+sub _key_str
+{
+	my $self = shift;
+	my $url = shift;
+
+	my $result;
+	foreach my $str (@_)
+	{
+		foreach my $c ($str =~ m{.}sg)
+		{
+			$result = $self->_key($url,
+					      "Lit_" .
+						uri_escape_utf8($c));
+			return undef if !$result;
+		}
+	}
+	return 1;
+}
+
+sub keydown
+{
+	my $self = shift;
+
+	return $self->_key("/keydown", @_);
+}
+
+sub keydown_str
+{
+	my $self = shift;
+
+print "inside keydown_str(@_)\n";
+	return $self->_key_str("/keydown", @_);
 }
 
 # XXX - Keyup
 #	POST keyup/$key
+
+sub keyup
+{
+	my $self = shift;
+
+	return $self->_key("/keyup", @_);
+}
 # XXX - Keypress
 #	POST keypress/$key
 
+sub keyup_str
+{
+	my $self = shift;
+
+	return $self->_key_str("/keyup", @_);
+}
+
+sub keypress
+{
+	my $self = shift;
+
+	return $self->_key("/keypress", @_);
+}
+
+sub keypress_str
+{
+	my $self = shift;
+
+	return $self->_key_str("/keypress", @_);
+}
+
 # XXX - Launch
 #	POST launch/$app_id[?$params...]
+
+sub launch
+{
+	my $self = shift;
+	my $app = shift;
+	my $contentid = shift;
+	my $mediatype = shift;
+
+	# XXX - Perhaps check whether $app is an ID or a name, and if
+	# the latter, try to look it up? How can we identify channel
+	# IDs?
+	# AFAICT channel IDs are of the form
+	#	^\d+(_[\da-f]{4})?$
+	# That is, a decimal number, optionally followed by an
+	# underscore and a four-hex-digit extension.
+
+	my @query_args = ();
+	if (defined($contentid))
+	{
+		push @query_args, "contentID" => $contentid;
+	}
+	if (defined($mediatype))
+	{
+		push @query_args, "mediaType" => $mediatype;
+	}
+
+	my $result = $self->_rest_request("POST", "/launch/$app", @query_args);
+	if (!$result->{'status'})
+	{
+		# Something went wrong;
+		warn "Error: launch/$app got status $result->{error}: $result->{message}";
+		return undef;
+	}
+	return 1;		# Happy
+}
 
 =head2 C<geticonbyid>
 
@@ -331,6 +438,7 @@ sub geticonbyid
 {
 	my $self = shift;
 	my $app_id = shift;
+	# XXX - Convert this:
 	my $result = $self->{'ua'}->get("$self->{url_base}/query/icon/$app_id");
 	if ($result->code !~ /^2..$/)
 	{
@@ -389,7 +497,76 @@ sub geticonbyname
 
 # XXX - Input - Send custom events to a Brightscript app
 #	POST /input?[$var=$val&...]
+# From the doc:
+# Example: POST /input?acceleration.x=0.0&acceleration.y=0.0&acceleration.z=9.8
 
+# acceleration.x , acceleration.y , acceleration.z
+# orientation.x , orientation.y , orientation.z
+# rotation.x , rotation.y , rotation.z
+# magnetic.x , magnetic.y , magnetic.z
+
+# XXX - Write up POD for the functions below.
+
+sub _input
+{
+	my $self = shift;
+	my $type = shift;	# Input type
+	my $x = shift;
+	my $y = shift;
+	my $z = shift;
+
+	my $result = $self->_rest_request("POST", "/input",
+		"$type.x" => $x,
+		"$type.x" => $y,
+		"$type.x" => $z);
+	if (!$result->{'status'})
+	{
+		# Something went wrong;
+		warn "Error: input/$type got status $result->{error}: $result->{message}";
+		return undef;
+	}
+	return 1;		# Happy
+}
+
+sub acceleration
+{
+	my $self = shift;
+	my $x = shift;
+	my $y = shift;
+	my $z = shift;
+
+	return $self->_input("acceleration", $x, $y, $z);
+}
+
+sub orientation
+{
+	my $self = shift;
+	my $x = shift;
+	my $y = shift;
+	my $z = shift;
+
+	return $self->_input("orientation", $x,  $y, $z);
+}
+
+sub rotation
+{
+	my $self = shift;
+	my $x = shift;
+	my $y = shift;
+	my $z = shift;
+
+	return $self->_input("rotation", $x,  $y, $z);
+}
+
+sub magnetic
+{
+	my $self = shift;
+	my $x = shift;
+	my $y = shift;
+	my $z = shift;
+
+	return $self->_input("magnetic", $x,  $y, $z);
+}
 =head1 SEE ALSO
 
 =over 4
