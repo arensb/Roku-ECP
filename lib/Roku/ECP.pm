@@ -296,184 +296,6 @@ sub apps
 	return @retval;
 }
 
-=head2 Keypress functions
-
-These functions use predefined key names. See L<KEY NAMES>.
-
-All of these functions take any number of arguments, and send all of
-the keys to the Roku in sequence.
-
-These functions all return 1 if successful, or undef otherwise. In
-case of error, the return status does not say which parts of the
-request were successful; the undef just means that something went
-wrong.
-
-=cut
-
-# _key
-# This is an internal helper function for the keydown/keyup/keypress
-# functions. It takes key names (from the KEY_* constants, above) and
-# issues a series of REST requests to send each key in turn to the
-# Roku.
-#
-# Returns 1 on success, or undef on failure. If it fails, the return
-# status doesn't say which keys succeeded; it just means that not all
-# of them succeeded.
-sub _key
-{
-	my $self = shift;
-	my $url = shift;	# The REST URL
-
-	foreach my $key (@_)
-	{
-		my $result = $self->_rest_request("POST", "$url/$key");
-
-		if (!$result->{'status'})
-		{
-			warn "Error: $url/$key got status $result->{error}: $result->{message}";
-			return undef;
-		}
-	}
-	return 1;			# Happy
-}
-
-# _key_str
-# This is an internal helper function similar to _key, but for letters
-# and such, rather than the buttons on the remote.
-#
-# It takes each string argument in turn, breaks it up into individual
-# characters, and uses _key to send each letter in turn. For instance,
-# the string "xyz" gets broken down into three requests: "Lit_x",
-# "Lit_y", and "Lit_z".
-#
-# And yes, you may pronounce it "keister" if you want.
-sub _key_str
-{
-	my $self = shift;
-	my $url = shift;	# The REST URL
-
-	my $result;
-	foreach my $str (@_)
-	{
-		# Break this string up into individual characters
-		foreach my $c ($str =~ m{.}sg)
-		{
-			# Send the character as a /key*/Lit_* REST
-			# request.
-			# Assume that the string is UTF-8, coded, so
-			# $c might be several non-ASCII bytes. We use
-			# uri_escape_utf8 to escape this properly, so
-			# that a Euro symbol gets sent as
-			# "Lit_%E2%82%AC"
-			$result = $self->_key($url,
-					      "Lit_" .
-						uri_escape_utf8($c));
-			return undef if !$result;
-		}
-	}
-	return 1;
-}
-
-=head3 C<keydown>
-
-  my $status = $r->keydown(key, [key...]);
-
-Sends a keydown event to the Roku. This is equivalent to pressing a
-key on the remote. Most people will want to use C<L<keypress>>
-instead.
-
-=cut
-
-sub keydown
-{
-	my $self = shift;
-
-	return $self->_key("/keydown", @_);
-}
-
-=head3 C<keydown_str>
-
-  my $status = $r->keydown_str($string, [$string...]);
-
-Takes a string, breaks it up into individual characters, and sends
-each one in turn to the Roku. Most people will want to use
-C<L<keypress_str>> instead.
-
-=cut
-
-sub keydown_str
-{
-	my $self = shift;
-
-print "inside keydown_str(@_)\n";
-	return $self->_key_str("/keydown", @_);
-}
-
-=head3 C<keyup>
-
-  my $status = $r->keyup(key, [key,...]);
-
-Sends a keyup event to the Roku. This is equivalent to releasing a key
-on the remote. Most people will want to use C<L<keypress>> instead.
-
-=cut
-
-sub keyup
-{
-	my $self = shift;
-
-	return $self->_key("/keyup", @_);
-}
-
-=head3 C<keyup_str>
-
-  my $status = $r->keyup_str($string, [$string...]);
-
-Takes a string, breaks it up into individual characters, and sends
-each one in turn to the Roku. Most people will want to use
-C<L<keypress_str>> instead.
-
-=cut
-
-sub keyup_str
-{
-	my $self = shift;
-
-	return $self->_key_str("/keyup", @_);
-}
-
-=head3 C<keypress>
-
-  my $status = $r->keypress(key, [key,...]);
-
-Sends a keypress event to the Roku. This is equivalent to releasing a key
-on the remote, then releasing it.
-
-=cut
-
-sub keypress
-{
-	my $self = shift;
-
-	return $self->_key("/keypress", @_);
-}
-
-=head3 C<keypress_str>
-
-  my $status = $r->keypress_str($string, [$string...]);
-
-Takes a string, breaks it up into individual characters, and sends
-each one in turn to the Roku.
-
-=cut
-
-sub keypress_str
-{
-	my $self = shift;
-
-	return $self->_key_str("/keypress", @_);
-}
-
 =head2 C<launch>
 
     $r->launch($app_id);
@@ -615,6 +437,184 @@ sub geticonbyname
 
 	# Call geticonbyid to do the hard work.
 	return $self->geticonbyid($id);
+}
+
+=head2 Keypress functions
+
+These functions use predefined key names. See L<KEY NAMES>.
+
+All of these functions take any number of arguments, and send all of
+the keys to the Roku in sequence.
+
+These functions all return 1 if successful, or undef otherwise. In
+case of error, the return status does not say which parts of the
+request were successful; the undef just means that something went
+wrong.
+
+=cut
+
+# _key
+# This is an internal helper function for the keydown/keyup/keypress
+# functions. It takes key names (from the KEY_* constants, above) and
+# issues a series of REST requests to send each key in turn to the
+# Roku.
+#
+# Returns 1 on success, or undef on failure. If it fails, the return
+# status doesn't say which keys succeeded; it just means that not all
+# of them succeeded.
+sub _key
+{
+	my $self = shift;
+	my $url = shift;	# The REST URL
+
+	foreach my $key (@_)
+	{
+		my $result = $self->_rest_request("POST", "$url/$key");
+
+		if (!$result->{'status'})
+		{
+			warn "Error: $url/$key got status $result->{error}: $result->{message}";
+			return undef;
+		}
+	}
+	return 1;			# Happy
+}
+
+# _key_str
+# This is an internal helper function similar to _key, but for letters
+# and such, rather than the buttons on the remote.
+#
+# It takes each string argument in turn, breaks it up into individual
+# characters, and uses _key to send each letter in turn. For instance,
+# the string "xyz" gets broken down into three requests: "Lit_x",
+# "Lit_y", and "Lit_z".
+#
+# And yes, you may pronounce it "keister" if you want.
+sub _key_str
+{
+	my $self = shift;
+	my $url = shift;	# The REST URL
+
+	my $result;
+	foreach my $str (@_)
+	{
+		# Break this string up into individual characters
+		foreach my $c ($str =~ m{.}sg)
+		{
+			# Send the character as a /key*/Lit_* REST
+			# request.
+			# Assume that the string is UTF-8, coded, so
+			# $c might be several non-ASCII bytes. We use
+			# uri_escape_utf8 to escape this properly, so
+			# that a Euro symbol gets sent as
+			# "Lit_%E2%82%AC"
+			$result = $self->_key($url,
+					      "Lit_" .
+						uri_escape_utf8($c));
+			return undef if !$result;
+		}
+	}
+	return 1;
+}
+
+=head3 C<keypress>
+
+  my $status = $r->keypress(key, [key,...]);
+
+Sends a keypress event to the Roku. This is equivalent to releasing a key
+on the remote, then releasing it.
+
+=cut
+
+sub keypress
+{
+	my $self = shift;
+
+	return $self->_key("/keypress", @_);
+}
+
+=head3 C<keypress_str>
+
+  my $status = $r->keypress_str($string, [$string...]);
+
+Takes a string, breaks it up into individual characters, and sends
+each one in turn to the Roku.
+
+=cut
+
+sub keypress_str
+{
+	my $self = shift;
+
+	return $self->_key_str("/keypress", @_);
+}
+
+=head3 C<keydown>
+
+  my $status = $r->keydown(key, [key...]);
+
+Sends a keydown event to the Roku. This is equivalent to pressing a
+key on the remote. Most people will want to use C<L<keypress>>
+instead.
+
+=cut
+
+sub keydown
+{
+	my $self = shift;
+
+	return $self->_key("/keydown", @_);
+}
+
+=head3 C<keydown_str>
+
+  my $status = $r->keydown_str($string, [$string...]);
+
+Takes a string, breaks it up into individual characters, and sends
+each one in turn to the Roku. Most people will want to use
+C<L<keypress_str>> instead.
+
+=cut
+
+sub keydown_str
+{
+	my $self = shift;
+
+print "inside keydown_str(@_)\n";
+	return $self->_key_str("/keydown", @_);
+}
+
+=head3 C<keyup>
+
+  my $status = $r->keyup(key, [key,...]);
+
+Sends a keyup event to the Roku. This is equivalent to releasing a key
+on the remote. Most people will want to use C<L<keypress>> instead.
+
+=cut
+
+sub keyup
+{
+	my $self = shift;
+
+	return $self->_key("/keyup", @_);
+}
+
+=head3 C<keyup_str>
+
+  my $status = $r->keyup_str($string, [$string...]);
+
+Takes a string, breaks it up into individual characters, and sends
+each one in turn to the Roku. Most people will want to use
+C<L<keypress_str>> instead.
+
+=cut
+
+sub keyup_str
+{
+	my $self = shift;
+
+	return $self->_key_str("/keyup", @_);
 }
 
 =head2 Vector input methods
