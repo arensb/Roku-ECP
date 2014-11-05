@@ -571,22 +571,9 @@ sub geticonbyid
 {
 	my $self = shift;
 	my $app_id = shift;
-	# XXX - Convert this:
-	my $result = $self->{'ua'}->get("$self->{url_base}/query/icon/$app_id");
-	if ($result->code !~ /^2..$/)
-	{
-		return {
-			status	=> undef,	# Unhappy
-			error	=> $result->code(),
-			message	=> $result->message(),
-		};
-	}
-
-	return {
-		status		=> 1,		# We're happy
-		"Content-Type"	=> $result->header("Content-Type"),
-		data		=> $result->decoded_content(),
-	};
+;
+	my $result = $self->_rest_request("GET", "/query/icon/$app_id");
+	return $result;
 }
 
 =head2 C<geticonbyname>
