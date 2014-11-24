@@ -1,12 +1,18 @@
-* Roku::ECP: Roku External Control Protocol
+=head1 Roku::ECP: Roku External Control Protocol
 
-** Requirements:
+=head2 Requirements:
 
-- Encode
-- URI
-- URI::Escape
-- LWP::UserAgent
-- FindBin
+=over 4
+
+=item Encode
+
+=item URI
+
+=item URI::Escape
+
+=item LWP::UserAgent
+
+=item FindBin
 
 Roku External Control Guide:
 http://sdkdocs.roku.com/display/sdkdoc/External+Control+Guide
@@ -14,7 +20,7 @@ http://sdkdocs.roku.com/display/sdkdoc/External+Control+Guide
 Roku also supports DIAL.
 http://www.dial-multiscreen.org/dial-protocol-specification
 
-* SSDP
+=head2 SSDP
 According to
 http://sdkdocs.roku.com/display/sdkdoc/External+Control+Guide
 the Roku supports Simple Service Discovery Protocol (SSDP), which is
@@ -27,8 +33,10 @@ Presumably need to send out the SSDP HTTP query out over UDP, while
 listening on UDP for incoming connections. By the same token, need to
 specify the port for the return connections to come in on.
 
-* Deep Linking
-** Channel Store
+=head2 Deep Linking
+
+=head3 Channel Store
+
 http://myroku.dom.ain:8060/launch/11?contentID=28
 
 11 is the Channel Store.
@@ -37,18 +45,21 @@ http://myroku.dom.ain:8060/launch/11?contentID=28
 Also works with private channels, looks like.
 Doesn't work with string channel IDs, though.
 
-** YouTube
+=head3 YouTube
+
 837 is the YouTube channel
 The ContentID is the YouTube video ID.
 http://myroku.dom.ain:8060/launch/837?contentID=sfbr8Y6NYL4
 
-** Pandora
+=head3 Pandora
+
 Pandora channel ID: 28
 http://myroku.dom.ain:8060/launch/28?contentID=40793346033480140
 
 The contentID is the ID of a Pandora channel.
 
-** Amazon Instant Video
+=head3 Amazon Instant Video
+
 Channel ID: 13
 
 There's probably a way to directly launch videos, but it's not as
