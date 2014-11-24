@@ -21,6 +21,7 @@ Roku also supports DIAL.
 http://www.dial-multiscreen.org/dial-protocol-specification
 
 =head2 SSDP
+
 According to
 http://sdkdocs.roku.com/display/sdkdoc/External+Control+Guide
 the Roku supports Simple Service Discovery Protocol (SSDP), which is
