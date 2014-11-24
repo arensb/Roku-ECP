@@ -14,6 +14,8 @@
 
 =item FindBin
 
+=back
+
 Roku External Control Guide:
 http://sdkdocs.roku.com/display/sdkdoc/External+Control+Guide
 
